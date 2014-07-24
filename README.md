@@ -104,3 +104,11 @@ share_content = {
 share_update = l.post('people/~/shares', params=share_content)
 print share_update
 ```
+
+CHANGELOG
+---------
+
+** Version 0.1.5-1 **
+ * Added `oauth_token` parameter to get_access_token function, since LinkedIn complains about it.
+ * Quick (very quick) PEP8 refactoring
+ * Some deprecated functions replaced

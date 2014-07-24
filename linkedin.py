@@ -3,14 +3,13 @@
 """ LinkedIn """
 
 __author__ = 'Mike Helmick <mikehelmick@me.com>'
-__version__ = '0.1.5'
+__version__ = '0.1.5-1'
 
-import urllib
 from urlparse import parse_qsl
-import httplib2
+import urllib
 import json
-
-import oauth2 as oauth
+import httplib2
+import oauth2
 
 
 class LinkedinAPIError(Exception):
@@ -78,18 +77,20 @@ class LinkedinAPI(object):
         # See if they're authenticating for the first or if they already have some tokens.
         # http://michaelhelmick.com/tokens.jpg
         if self.api_key is not None and self.api_secret is not None:
-            self.consumer = oauth.Consumer(key=self.api_key,
-                                           secret=self.api_secret)
+            self.consumer = oauth2.Consumer(key=self.api_key,
+                                            secret=self.api_secret)
 
         if self.oauth_token is not None and self.oauth_secret is not None:
-            self.token = oauth.Token(key=oauth_token, secret=oauth_token_secret)
+            self.token = oauth2.Token(key=oauth_token,
+                                      secret=oauth_token_secret)
 
         if self.consumer is not None and self.token is not None:
             # Authenticated
-            self.client = oauth.Client(self.consumer, self.token, **client_args)
+            self.client = oauth2.Client(self.consumer, self.token,
+                                        **client_args)
         elif self.consumer is not None:
             # Authenticating
-            self.client = oauth.Client(self.consumer, **client_args)
+            self.client = oauth2.Client(self.consumer, **client_args)
         else:
             # Unauthenticated requests (for LinkedIn calls available to public)
             self.client = httplib2.Http(**client_args)
@@ -111,7 +112,7 @@ class LinkedinAPI(object):
                 'There was a problem authenticating you. Error: {0}, Message: {1}'.format(
                     status, content))
 
-        request_tokens = dict(urlparse.parse_qsl(content))
+        request_tokens = dict(parse_qsl(content))
 
         auth_url_params = {
             'oauth_token': request_tokens['oauth_token'],
@@ -135,7 +136,7 @@ class LinkedinAPI(object):
             '{0}?oauth_token={1}%oauth_verifier={2}'.format(
                 self.access_token_url, self.oauth_token, oauth_verifier),
             'POST')
-        return dict(urlparse.parse_qsl(content))
+        return dict(parse_qsl(content))
 
     def api_request(self, endpoint, method='GET', fields='', params={}):
         url = self.api_url + endpoint
@@ -144,9 +145,8 @@ class LinkedinAPI(object):
             url = '{0}:({1})'.format(url, fields)
 
         if method == 'POST':
-            resp, content = self.client.request(url, 'POST',
-                                                body=json.dumps(params),
-                                                headers=self.headers)
+            resp, content = self.client.request(
+                url, 'POST', body=json.dumps(params), headers=self.headers)
 
             # As far as I've seen, all POSTs return a 201 and NO body -.-
             # So, we'll just return true if it's a post and returns 201
@@ -162,7 +162,7 @@ class LinkedinAPI(object):
 
         try:
             content = json.loads(content)
-        except json.JSONDecodeError:
+        except ValueError:
             raise LinkedinAPIError(
                 'Content is not valid JSON, unable to be decoded.')
 
