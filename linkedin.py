@@ -6,25 +6,11 @@ __author__ = 'Mike Helmick <mikehelmick@me.com>'
 __version__ = '0.1.5'
 
 import urllib
-
-try:
-    from urlparse import parse_qsl
-except ImportError:
-    from cgi import parse_qsl
+from urlparse import parse_qsl
+import httplib2
+import json
 
 import oauth2 as oauth
-import httplib2
-
-try:
-    import simplejson as json
-except ImportError:
-    try:
-        import json
-    except ImportError:
-        try:
-            from django.utils import simplejson as json
-        except ImportError:
-            raise ImportError('A json library is required to use this python library. Lol, yay for being verbose. ;)')
 
 
 class LinkedinAPIError(Exception):
@@ -35,12 +21,15 @@ class LinkedinAPIError(Exception):
     def __str__(self):
         return repr(self.message)
 
-        
-class LinkedinAuthError(LinkedinAPIError): pass
+
+class LinkedinAuthError(LinkedinAPIError):
+    pass
 
 
 class LinkedinAPI(object):
-    def __init__(self, api_key=None, api_secret=None, oauth_token=None, oauth_token_secret=None, headers=None, client_args=None, callback_url=None, permissions=None):
+    def __init__(self, api_key=None, api_secret=None, oauth_token=None,
+                 oauth_token_secret=None, headers=None, client_args=None,
+                 callback_url=None, permissions=None):
         self.api_key = api_key
         self.api_secret = api_secret
         self.oauth_token = oauth_token
@@ -51,12 +40,13 @@ class LinkedinAPI(object):
         # Authentication URLs
         self.request_token_url = 'https://api.linkedin.com/uas/oauth/requestToken'
         self.access_token_url = 'https://api.linkedin.com/uas/oauth/accessToken'
-		# Authentication page in http://developer.linkedin.com/documents/authentication states that 
-		# endpoint is the following not the previous url used.
+        # Authentication page in http://developer.linkedin.com/documents/authentication states that
+        # endpoint is the following not the previous url used.
         self.authorize_url = 'https://api.linkedin.com/uas/oauth/authenticate'
 
         if self.callback_url:
-            self.request_token_url = '%s?oauth_callback=%s' % (self.request_token_url, self.callback_url)
+            self.request_token_url = '{0}?oauth_callback={1}'.format(
+                self.request_token_url, self.callback_url)
 
         if self.permissions:
             delimiter = "&" if self.callback_url else "?"
@@ -64,16 +54,17 @@ class LinkedinAPI(object):
                 permissions = "+".join(self.permissions)
             else:
                 permissions = self.permissions
-            self.request_token_url = '%s%sscope=%s' % (self.request_token_url, delimiter, permissions)
+            self.request_token_url = '{0}{1}scope={2}'.format(
+                self.request_token_url, delimiter, permissions)
 
         self.api_base = 'http://api.linkedin.com'
         self.api_version = 'v1'
-        self.api_url = '%s/%s/' % (self.api_base, self.api_version)
+        self.api_url = '{0}/{1}/'.format(self.api_base, self.api_version)
 
         # If there's headers, set them. If not, lets
         self.headers = headers
         if self.headers is None:
-            self.headers = {'User-agent': 'Linkedin %s' % __version__}
+            self.headers = {'User-agent': 'Linkedin {0}'.format(__version__)}
 
         # ALL requests will be json. Enforcing it here...
         self.headers.update({'x-li-format': 'json',
@@ -87,7 +78,8 @@ class LinkedinAPI(object):
         # See if they're authenticating for the first or if they already have some tokens.
         # http://michaelhelmick.com/tokens.jpg
         if self.api_key is not None and self.api_secret is not None:
-            self.consumer = oauth.Consumer(key=self.api_key, secret=self.api_secret)
+            self.consumer = oauth.Consumer(key=self.api_key,
+                                           secret=self.api_secret)
 
         if self.oauth_token is not None and self.oauth_secret is not None:
             self.token = oauth.Token(key=oauth_token, secret=oauth_token_secret)
@@ -115,15 +107,19 @@ class LinkedinAPI(object):
 
         status = int(resp['status'])
         if status != 200:
-            raise LinkedinAuthError('There was a problem authenticating you. Error: %s, Message: %s' % (status, content))
+            raise LinkedinAuthError(
+                'There was a problem authenticating you. Error: {0}, Message: {1}'.format(
+                    status, content))
 
-        request_tokens = dict(parse_qsl(content))
+        request_tokens = dict(urlparse.parse_qsl(content))
 
         auth_url_params = {
             'oauth_token': request_tokens['oauth_token'],
         }
 
-        request_tokens['auth_url'] = self.authorize_url + '?' + urllib.urlencode(auth_url_params)
+        request_tokens[
+            'auth_url'] = self.authorize_url + '?' + urllib.urlencode(
+            auth_url_params)
 
         return request_tokens
 
@@ -135,18 +131,22 @@ class LinkedinAPI(object):
             oauth_token = authorized_tokens['oauth_token']
             oauth_token_secret = authorized_tokens['oauth_token_secret']
         """
-
-        resp, content = self.client.request('%s?oauth_verifier=%s' % (self.access_token_url, oauth_verifier), 'POST')
-        return dict(parse_qsl(content))
+        resp, content = self.client.request(
+            '{0}?oauth_token={1}%oauth_verifier={2}'.format(
+                self.access_token_url, self.oauth_token, oauth_verifier),
+            'POST')
+        return dict(urlparse.parse_qsl(content))
 
     def api_request(self, endpoint, method='GET', fields='', params={}):
         url = self.api_url + endpoint
 
         if fields:
-            url = '%s:(%s)' % (url, fields)
+            url = '{0}:({1})'.format(url, fields)
 
         if method == 'POST':
-            resp, content = self.client.request(url, 'POST', body=json.dumps(params), headers=self.headers)
+            resp, content = self.client.request(url, 'POST',
+                                                body=json.dumps(params),
+                                                headers=self.headers)
 
             # As far as I've seen, all POSTs return a 201 and NO body -.-
             # So, we'll just return true if it's a post and returns 201
@@ -156,16 +156,21 @@ class LinkedinAPI(object):
             if 'status' in resp and int(resp['status']) == 201:
                 return True
         else:
-            resp, content = self.client.request('%s?%s' % (url, urllib.urlencode(params)), 'GET', headers=self.headers)
+            resp, content = self.client.request(
+                '{0}?{1}'.format(url, urllib.urlencode(params)), 'GET',
+                headers=self.headers)
 
         try:
             content = json.loads(content)
         except json.JSONDecodeError:
-            raise LinkedinAPIError('Content is not valid JSON, unable to be decoded.')
+            raise LinkedinAPIError(
+                'Content is not valid JSON, unable to be decoded.')
 
         status = int(resp['status'])
         if status < 200 or status >= 300:
-            raise LinkedinAPIError('Error Code: %d, Message: %s' % (status, content['message']), status)
+            raise LinkedinAPIError(
+                'Error Code: {0}, Message: {1}'.format(
+                    status, content['message']), status)
 
         return content
 
@@ -175,4 +180,5 @@ class LinkedinAPI(object):
 
     def post(self, endpoint, fields='', params=None):
         params = params or {}
-        return self.api_request(endpoint, method='POST', fields=fields, params=params)
+        return self.api_request(endpoint, method='POST', fields=fields,
+                                params=params)
