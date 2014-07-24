@@ -1,3 +1,4 @@
+# coding=utf-8
 #!/usr/bin/env python
 
 """ LinkedIn """
@@ -8,6 +9,7 @@ __version__ = '0.1.5-1'
 from urlparse import parse_qsl
 import urllib
 import json
+
 import httplib2
 import oauth2
 
@@ -138,7 +140,9 @@ class LinkedinAPI(object):
             'POST')
         return dict(parse_qsl(content))
 
-    def api_request(self, endpoint, method='GET', fields='', params={}):
+    def api_request(self, endpoint, method='GET', fields='', params=None):
+        if not params:
+            params = {}
         url = self.api_url + endpoint
 
         if fields:
