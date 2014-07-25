@@ -135,7 +135,7 @@ class LinkedinAPI(object):
             oauth_token_secret = authorized_tokens['oauth_token_secret']
         """
         resp, content = self.client.request(
-            '{0}?oauth_token={1}%oauth_verifier={2}'.format(
+            '{0}?oauth_token={1}&oauth_verifier={2}'.format(
                 self.access_token_url, self.oauth_token, oauth_verifier),
             'POST')
         return dict(parse_qsl(content))
